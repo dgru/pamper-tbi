@@ -12,7 +12,8 @@
     setwd("/Users/dgruen/Documents/Academia/Pitt_T32/projects/pamper/data/") # set the working directory
     set.seed(386) # make code reproducible
 
-## Dependencies
+## Dependencies (these libraries must be loaded for code and analyses)
+    # library(gmodels) # cross tabs for chi square
     library(yardstick) # ROC curves & AUC
     library(haven)  # reads in SPSS files
     library(gdata)  # reads excel files and more
@@ -48,34 +49,33 @@
     library(rms)
     library(pec)
     library(corrplot)
-    library(Amelia)
     library(mlbench)
     library(gee)
     library(geepack)
+    library(cmprsk)
 
 ############################## File Setup ##############################
-############################## Clean Data ##############################
-############################## Data Inspection ##############################
-############################## Main Tables and Figures ##############################   
-## Fig: CONSORT diagram
-    df <- df_master_filtered_wide
     
+############################## Clean Data ##############################
+    
+############################## Data Inspection ##############################
+    
+############################## Tables and Figures ##############################   
+    
+## For CONSORT diagram
+    df <- df_master_filtered_wide
     tally_df <- df %>%
       group_by(FFP, TBI) %>%   # group by Biomarker
       tally()
     tally_df
     
 ## Table: Characteristics of TBI vs. No TBI
-    # note: this was cross/spot checked with SPSS 
-    
     df <- df_master_filtered_wide
-    # dput(df)
-    
-    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
-    
+   
     myVars <- c("age", "gender",  "race",
                 
-                "initial_GCS", "initial_GCS_8", "total_gcs_score", "iss",
+                "initial_GCS", "initial_GCS_8", "total_gcs_score",
+                "ed_initial_gcs", "ed_highest_gcs", "ed_lowest_gcs", "iss",
                 "PH_sbp_70", "TBI", "chest_injury", "abdominal_injury", 
                 "extremity_injury", "spinal_cord_injury", "any_blunt", "blunt_mechanism",
                 "any_penetrating", "penetrating_mechanism",
@@ -89,7 +89,7 @@
                 "platelets_24h", "crystalloid_24h", "vaso_24h", "prbc_10_24h", "prbc_4_24h",
                 "ex_lap_24", "crani_24", "IR_V_E_24", "ortho_24", "proc_other_24",
                 
-                "alive_at_30", "mortality_24h", "ed_coagulopathy", 
+                "alive_at_30", "mortality_24h", "ed_coagulopathy", "ed_coagulopathy_grade",
                 "MOF", "ALI", "NI", "icu_los", "hospital_los", "mech_vent_days",
                 
                 "GFAP_0", "GFAP_24", "GFAP_72", "UCH_L1_0", "UCH_L1_24", "UCH_L1_72")
@@ -105,18 +105,16 @@
     
     tab1 <- CreateTableOne(vars = myVars, data = df, strata = "TBI", factorVars = catVars)
     tab1 <- print(tab1, nonnormal = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
-    # xtable(tab1)
     View(tab1)
     
 ## Table: Within TBI, Characteristics of prehospital plasma vs. standard care
     df <- df_master_filtered_wide
     df <- filter(df, TBI==1)
 
-    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
-    
     myVars <- c("age", "gender", "race",
                 
-                "initial_GCS", "initial_GCS_8", "total_gcs_score", "iss",
+                "initial_GCS", "initial_GCS_8", "total_gcs_score",
+                "ed_initial_gcs", "ed_highest_gcs", "ed_lowest_gcs", "iss",
                 "PH_sbp_70", "TBI", "chest_injury", "abdominal_injury", 
                 "extremity_injury", "spinal_cord_injury", "any_blunt", "blunt_mechanism", 
                 "any_penetrating", "penetrating_mechanism",
@@ -130,10 +128,12 @@
                 "platelets_24h", "crystalloid_24h", "vaso_24h", "prbc_10_24h", "prbc_4_24h",
                 "ex_lap_24", "crani_24", "IR_V_E_24", "ortho_24", "proc_other_24",
                 
-                "alive_at_30", "mortality_24h", "ed_coagulopathy", 
+                "alive_at_30", "mortality_24h", "ed_coagulopathy", "ed_coagulopathy_grade",
                 "MOF", "ALI", "NI", "icu_los", "hospital_los", "mech_vent_days",
                 
-                "GFAP_0", "GFAP_24", "GFAP_72", "UCH_L1_0", "UCH_L1_24", "UCH_L1_72")
+                "GFAP_0", "GFAP_24", "GFAP_72", "UCH_L1_0", "UCH_L1_24", "UCH_L1_72",
+                
+                "cause_of_death")
     
     catVars <- c("gender", "race", "alive_at_30", "TBI", "severe_head", "ed_coagulopathy", "chest_injury",
                  "abdominal_injury", "extremity_injury", "spinal_cord_injury",
@@ -141,44 +141,41 @@
                  "any_blunt", "blunt_mechanism",  "any_penetrating", "penetrating_mechanism",
                  "PH_CPR", "initial_GCS_8", "plasma_on_helicopter", "transfer",
                  "PH_blood", "ed_trali", "mortality_24h", "vaso_24h", "prbc_10_24h", "prbc_4_24h",
-                 "ex_lap_24", "crani_24", "IR_V_E_24", "ortho_24", "proc_other_24", "PH_time_high"
+                 "ex_lap_24", "crani_24", "IR_V_E_24", "ortho_24", "proc_other_24", "PH_time_high",
+                 
+                 "cause_of_death"
                  )
     
     tab1 <- CreateTableOne(vars = myVars, data = df, strata = "FFP", factorVars = catVars)
-    tab1 <- print(tab1, nonnormal = TRUE, exact = "crani_24", quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
-    # xtable(tab1)
+    tab1 <- print(tab1, nonnormal = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
     View(tab1)
 
 ## Analysis: Generalized Estimating Equations (GEE) (account for site clusters)
-    ## Using a generalized estimating equations model to account for trial cluster effects and multiple confounders, 
-    ## and testing an interaction between TBI and randomization group (plasma vs control):
-  
+    
     ## Data frame
     df <- df_master_filtered_wide
-    df <- filter(df, alive_at_30==1 | alive_at_30==2) # filter to only keep patients with outcomes
     df$ais_head <- as.numeric(as.character(df$ais_head))
     
-    ## get rid of any missing data in the fields used to run code
-    df <- select(df, stnum, t_30d_censor_h, FFP, TBI, 
+    ## get rid of any NAs
+    df <- select(df, stnum, t_30d_censor_h, FFP, TBI, alive_at_30,
                  iss, MOI, SiteID, PH_time_high,
                  PH_prbc, PH_crystalloid, PH_blood,
-                 PH_sbp_70, ais_head)
+                 PH_sbp_70, age, gender, initial_GCS_8, ais_head)
     
     df <- na.omit(df)
 
-    fit.gee <- geeglm(t_30d_censor_h ~ TBI * FFP + iss + 
+    fit.gee <- geeglm(t_30d_censor_h ~ TBI * FFP + iss + ais_head +
                         PH_prbc + PH_crystalloid + PH_blood + 
-                        MOI + PH_sbp_70 + ais_head + PH_time_high,
+                        MOI + PH_sbp_70  + PH_time_high +
+                        age + gender + initial_GCS_8
+                        ,
                       family = binomial,
                       data = df, 
                       id = SiteID,
                       corstr = "exchangeable")
     summary(fit.gee)
     
-    ## Conclusion: after adjustment for multiple confounders and site clustering, 
-    ## TBI significantly modified the effect of plasma vs control on death
-    ## with the benefit effect of plasma seen only in TBI trauma patients. 	
-    ## Can split for K-M survival analysis
+    
 
 ## Figure: Kaplan Meier Survival
     ## No TBI
@@ -217,140 +214,160 @@
 ## Analysis: Cox Hazard Model TBI and No TBI
     ## COX within TBI
     df <- df_master_filtered_wide
-    # dput(df)
     df <- filter(df, TBI==1)
-    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
+
+    df$iss_cat[which(df$iss < 25)] = 0
+    df$iss_cat[which(df$iss >= 25)] = 1
+    df$iss_cat <- as.factor(df$iss_cat)
     
-    res.cox <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ FFP + age +
-                       transfer + ais_head + PH_crystalloid + PH_blood + PH_prbc +
-                       iss + PH_intubation,
+    res.cox <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ 
+                       age + 
+                       total_gcs_score +
+                       iss_cat + 
+                       ais_head +
+                       PH_crystalloid + 
+                       FFP + 
+                       PH_prbc +
+                       PH_intubation +
+                       PH_time_high +
+                       gender +
+                       transfer
+                     ,
                      data =  df)
     
     summary(res.cox)
     
-    vif(res.cox) # to test multicolinearity
+    vif(res.cox)
     
     test.ph <- cox.zph(res.cox)
     test.ph
-    
-    # From the output above, the test is not statistically significant for each of the covariates,
-    # and the global test is also not statistically significant.
-    # Therefore, we can assume the proportional hazards.
-    
+   
     ## COX within NO TBI
     df <- df_master_filtered_wide
-    # dput(df)
     df <- filter(df, TBI==2)
-    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
+     
+    df$iss_cat <- NA
+    df$iss_cat[which(df$iss < 25)] = 0
+    df$iss_cat[which(df$iss >=25)] = 1
+    df$iss_cat <- as.factor(df$iss_cat)
     
-    res.cox <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ FFP + age +
-                       transfer + PH_crystalloid + PH_blood + PH_prbc +
-                       iss + PH_intubation,
+    res.cox <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ 
+                       age + 
+                       total_gcs_score +
+                       iss_cat + 
+                       ais_head +
+                       PH_crystalloid + 
+                       FFP + 
+                       PH_prbc +
+                       PH_intubation +
+                       PH_time_high +
+                       gender +
+                       transfer
+                     ,
                      data =  df)
     
     summary(res.cox)
     
     test.ph <- cox.zph(res.cox)
     test.ph
-    
 
-## TBI biomarkers / SC vs PP
+    
+ ## Figure: box plot SC vs FFP
+    df <- df_master_filtered_long
+    df <- filter(df, !is.na(hour)) # get rid of NA
+    df <- filter(df, Biomarker=="GFAP" | Biomarker=="UCH_L1")
+    ggplot(df %>% 
+             unite(twoby, hour, FFP, remove = F), 
+           aes(x = twoby,
+               y = Concentration,
+               fill=as.factor(FFP))) +
+      geom_boxplot(outlier.shape = NA) +
+      geom_jitter(width=0.3, alpha=0.2) +
+      facet_wrap(~Biomarker, scales = "free") +
+      theme_classic() +
+      theme_classic() +
+      scale_fill_manual(values = c("#ffffff", "#969696")) +
+      theme(aspect.ratio=1)
+    
+## Figure: box plot TBI vs. No TBI
+    df <- df_master_filtered_long
+    df <- filter(df, !is.na(hour)) # get rid of NA
+    df <- filter(df, Biomarker=="GFAP" | Biomarker=="UCH_L1")
+    ggplot(df %>% 
+             unite(twoby, hour, TBI, remove = F), 
+           aes(x = twoby,
+               y = Concentration,
+               fill=as.factor(TBI))) +
+      geom_boxplot(outlier.shape = NA) +
+      geom_jitter(width=0.3, alpha=0.2) +
+      facet_wrap(~Biomarker, scales = "free") +
+      theme_classic() +
+      theme_classic() +
+      scale_fill_manual(values = c("#ffffff", "#969696")) +
+      theme(aspect.ratio=1)
+
+  
+## Figure: Kaplan Meier early vs late plasma; Scene PP vs SC vs Transfer PP vs SC
+    ## Transfer
     df <- df_master_filtered_wide
-    df <- filter(df, !is.na(TBI))
-    df <- filter(df, !is.na(FFP))
+    df <- filter(df, transfer==1)
+    df <- filter(df, TBI==1)
     
-    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
+    fit <- survfit(Surv(t_30d_mort_h, t_30d_censor_h) ~ plasma_on_helicopter, data = df) # Fit survival curves 
     
-    myVars <- c("GFAP_0", "GFAP_24", "GFAP_72", "UCH_L1_0", "UCH_L1_24", "UCH_L1_72")
+    ggsurvplot(fit,
+               legend = "bottom", 
+               legend.title = "Prehospital Plasma",
+               break.time.by = 250, # break time axis by 168 hours (make it weeks)
+               legend.labs = c("Plasma", "No Plasma"),
+               # conf.int = TRUE, # Add confidence interval
+               pval = TRUE,
+               risk.table = TRUE,
+               cumcensor = TRUE) # Add p-value
     
-    tab1 <- CreateTableOne(vars = myVars, data = df, strata = "TBI")
-    tab1 <- print(tab1, nonnormal = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
-    # xtable(tab1)
-    View(tab1)
+    ## Scene
+    df <- df_master_filtered_wide
+    df <- filter(df, transfer==0)
+    df <- filter(df, TBI==1)
     
-   ## Figure: box plot SC vs FFP
-      df <- df_master_filtered_long
-      df <- filter(df, !is.na(hour)) # get rid of NA
-      df <- filter(df, Biomarker=="GFAP" | Biomarker=="UCH_L1")
-      ggplot(df %>% 
-               unite(twoby, hour, FFP, remove = F), 
-             aes(x = twoby,
-                 y = Concentration,
-                 fill=as.factor(FFP))) +
-        geom_boxplot(outlier.shape = NA) +
-        geom_jitter(width=0.3, alpha=0.2) +
-        facet_wrap(~Biomarker, scales = "free") +
-        theme_classic() +
-        theme_classic() +
-        scale_fill_manual(values = c("#ffffff", "#969696")) +
-        theme(aspect.ratio=1)
-      
-  ## Figure: box plot TBI vs. No TBI
-      df <- df_master_filtered_long
-      df <- filter(df, !is.na(hour)) # get rid of NA
-      df <- filter(df, Biomarker=="GFAP" | Biomarker=="UCH_L1")
-      ggplot(df %>% 
-               unite(twoby, hour, TBI, remove = F), 
-             aes(x = twoby,
-                 y = Concentration,
-                 fill=as.factor(TBI))) +
-        geom_boxplot(outlier.shape = NA) +
-        geom_jitter(width=0.3, alpha=0.2) +
-        facet_wrap(~Biomarker, scales = "free") +
-        theme_classic() +
-        theme_classic() +
-        scale_fill_manual(values = c("#ffffff", "#969696")) +
-        theme(aspect.ratio=1)
-
+    fit <- survfit(Surv(t_30d_mort_h, t_30d_censor_h) ~ plasma_on_helicopter, data = df) # Fit survival curves 
     
-## Figure: Forest Plot
-    ## Generate Hazard Ratios: head injury severity
+    ggsurvplot(fit,
+               legend = "bottom", 
+               legend.title = "Prehospital Plasma",
+               break.time.by = 250, # break time axis by 168 hours (make it weeks)
+               legend.labs = c("Plasma", "No Plasma"),
+               # conf.int = TRUE, # Add confidence interval
+               pval = TRUE,
+               risk.table = TRUE,
+               cumcensor = TRUE) # Add p-value
+  
+## Forest plot
+    ## GCS Groups
     df <- df_master_filtered_wide
     df$head_groups_dsg <- NA
-    
-    ## Assign head injury severity groups
-    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
     df$head_groups_dsg[which(df$TBI == 2)] = 0
-    df$head_groups_dsg[which(df$TBI == 1 & df$ais_head<=3)] = 1
-    df$head_groups_dsg[which(df$TBI == 1 & (df$ais_head>3))] = 2
+    df$head_groups_dsg[which(df$TBI == 1 & df$total_gcs_score > 8)] = 1 
+    df$head_groups_dsg[which(df$TBI == 1 & df$total_gcs_score <= 8)] = 2 
     df$head_groups_dsg <- as.factor(df$head_groups_dsg) # make it a factor
     df_master_filtered_wide_head_groups <- df
     
-    df <- df_master_filtered_wide_head_groups
-    df <- filter(df, !is.na(head_groups_dsg))
-    df <- filter(df, !is.na(alive_at_30))
-
-    df <- df_master_filtered_wide_head_groups
-    df <- filter(df, head_groups_dsg==0)
-    
-    res.cox <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ FFP, data =  df)
-    
-    test <- summary(res.cox)
-    coef(summary(res.cox))
-    
-    ggforest(res.cox, data = df)
-    
-    # Put this output into df
-    
-    
-    ## Generate Hazard Ratios: polytrauma
+    ## Polytrauma Groups
     df <- df_master_filtered_wide
     df$trauma_groups_dsg <- NA
-    
-    ## Make polytrauma groups
-    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
     df$trauma_groups_dsg[which(df$TBI == 2)] = 0
     df$trauma_groups_dsg[which(df$TBI == 1 & df$ais_abdomen<3 & df$ais_chest<3 & df$ais_extremity<3)] = 1
     df$trauma_groups_dsg[which(df$TBI == 1 & (df$ais_abdomen>=3 | df$ais_chest>=3 | df$ais_extremity>=3))] = 2
     df$trauma_groups_dsg <- as.factor(df$trauma_groups_dsg) # make it a factor
-    
     df_master_filtered_wide_head <- df
+    
+    ## Generate HR
     df <- df_master_filtered_wide_head
     df <- filter(df, !is.na(trauma_groups_dsg))
     df <- filter(df, !is.na(alive_at_30))
     
     df <- df_master_filtered_wide_head
-    df <- filter(df, trauma_groups_dsg==0)
+    df <- filter(df, trauma_groups_dsg==2)
     
     res.cox <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ FFP, data =  df)
     
@@ -358,13 +375,11 @@
     coef(summary(res.cox))
     
     ggforest(res.cox, data = df)
-    
     # Put this output into df
+   
     
-    
-    ## Final Plot
+    ## Forest Plot
     RR_data <- read.xls("cox_output_all_groups.xlsx")
-     
     p = ggplot(data=RR_data,
                aes(x = Group,y = RiskRatio, ymin = LowerLimit, ymax = UpperLimit ))+
       geom_pointrange(aes(col=Group))+
@@ -382,41 +397,8 @@
       coord_flip() +
       scale_y_log10(limits=c(0.01,12))
     p
-  
-    
-## Figure: Kaplan Meier early vs late plasma; Scene PP vs SC vs Transfer PP vs SC
-    ## Transfer
-    df <- df_master_filtered_wide
-    df <- filter(df, transfer==1)
-    
-    fit <- survfit(Surv(t_30d_mort_h, t_30d_censor_h) ~ plasma_on_helicopter, data = df) # Fit survival curves 
-    
-    ggsurvplot(fit,
-               legend = "bottom", 
-               legend.title = "Prehospital Plasma",
-               break.time.by = 250, # break time axis by 168 hours (make it weeks)
-               legend.labs = c("Plasma", "No Plasma"),
-               # conf.int = TRUE, # Add confidence interval
-               pval = TRUE,
-               risk.table = TRUE,
-               cumcensor = TRUE) # Add p-value
-    
-    ## Scene
-    df <- df_master_filtered_wide
-    df <- filter(df, transfer==0)
-    
-    fit <- survfit(Surv(t_30d_mort_h, t_30d_censor_h) ~ plasma_on_helicopter, data = df) # Fit survival curves 
-    
-    ggsurvplot(fit,
-               legend = "bottom", 
-               legend.title = "Prehospital Plasma",
-               break.time.by = 250, # break time axis by 168 hours (make it weeks)
-               legend.labs = c("Plasma", "No Plasma"),
-               # conf.int = TRUE, # Add confidence interval
-               pval = TRUE,
-               risk.table = TRUE,
-               cumcensor = TRUE) # Add p-value
-    
+
+
 ############################## Save ##############################   
 ## Optional: Save a table to .csv
     # write.table(biomarkers_long,
@@ -425,4 +407,6 @@
     #             eol = "\n", na = "NA", dec = ".", row.names = TRUE,
     #             col.names = TRUE, qmethod = c("escape", "double"),
     #             fileEncoding = "")
- 
+
+    
+##  END.
