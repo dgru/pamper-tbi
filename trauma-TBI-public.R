@@ -4,7 +4,7 @@
 ## Project Support: NIH T32 in Trauma and Sepsis, University of Pittsburgh Department of Surgery
 ## PI: Dr. Jason Sperry
 ## Written by Danielle Gruen, October 2019
-## Last updated: January 2020
+## Last updated: March 2020
 
 ############################## Workspace Setup ##############################
 ## Set Up Workspace
@@ -53,6 +53,8 @@
     library(gee)
     library(geepack)
     library(cmprsk)
+    library(frailtySurv)
+    library(fragilityindex)
 
 ############################## File Setup ##############################
     
@@ -62,96 +64,105 @@
     
 ############################## Tables and Figures ##############################   
     
-## For CONSORT diagram
+## CONSORT diagram
     df <- df_master_filtered_wide
     tally_df <- df %>%
-      group_by(FFP, TBI) %>%   # group by Biomarker
+      group_by(FFP, TBI) %>%
       tally()
     tally_df
     
-## Table: Characteristics of TBI vs. No TBI
+## Table 1: Characteristics of TBI vs. No TBI
     df <- df_master_filtered_wide
-   
-    myVars <- c("age", "gender",  "race",
+    df <- filter(df, !is.na(FFP))
+    df <- filter(df, !is.na(TBI))
+    
+    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
+    
+    df$gcs_cat <- NA
+    df$gcs_cat[which(df$total_gcs_score < 8)] = 0
+    df$gcs_cat[which(df$total_gcs_score >= 8 & df$total_gcs_score<13)] = 1
+    df$gcs_cat[which(df$total_gcs_score >= 13)] = 2
+    df$gcs_cat <- as.factor(df$gcs_cat)
+    
+    df$ED_gcs_cat <- NA
+    df$ED_gcs_cat[which(df$ed_initial_gcs < 8)] = 0
+    df$ED_gcs_cat[which(df$ed_initial_gcs >= 8 & df$ed_initial_gcs<13)] = 1
+    df$ED_gcs_cat[which(df$ed_initial_gcs >= 13)] = 2
+    df$ED_gcs_cat <- as.factor(df$ED_gcs_cat)
+    
+    
+    myVars <- c("age", "gender",  "race", "vitk", "antiplt",
                 
-                "initial_GCS", "initial_GCS_8", "total_gcs_score",
-                "ed_initial_gcs", "ed_highest_gcs", "ed_lowest_gcs", "iss",
-                "PH_sbp_70", "TBI", "chest_injury", "abdominal_injury", 
-                "extremity_injury", "spinal_cord_injury", "any_blunt", "blunt_mechanism",
-                "any_penetrating", "penetrating_mechanism",
-                "severe_head", "ais_head", "ais_chest", "ais_abdomen", "ais_extremity", "vitals_hr", "vitals_sbp",
+                "iss","ais_head", "ais_chest", "ais_abdomen", "ais_extremity",
+                "gcs_cat", "ED_gcs_cat", "PH_sbp_70", "TBI", "spinal_cord_injury", "any_blunt",
+                "blunt_mechanism",
                 
                 "PH_intubation", "PH_CPR", "plasma_on_helicopter", "PH_crystalloid",
-                "PH_prbc", "PH_blood", "PH_time", "PH_time_high", "transfer",
+                "PH_prbc", "PH_blood", "PH_time", "transfer",
                 
-                "INR", "alpha", "K", "MA", "LY30", "hyperfibrinolysis",
-                "transfusion_24h", "prbc_24h", "plasma_24h", "lactate_val",
-                "platelets_24h", "crystalloid_24h", "vaso_24h", "prbc_10_24h", "prbc_4_24h",
-                "ex_lap_24", "crani_24", "IR_V_E_24", "ortho_24", "proc_other_24",
+                "INR", "ACT", "alpha", "K", "MA", "LY30", 
+                "transfusion_24h", "prbc_24h", "plasma_24h",
+                "platelets_24h", "crystalloid_24h", "vaso_24h", "prbc_10_24h",
+                "crani_24",
                 
-                "alive_at_30", "mortality_24h", "ed_coagulopathy", "ed_coagulopathy_grade",
-                "MOF", "ALI", "NI", "icu_los", "hospital_los", "mech_vent_days",
-                
-                "GFAP_0", "GFAP_24", "GFAP_72", "UCH_L1_0", "UCH_L1_24", "UCH_L1_72")
+                "t_30d_censor_h", "mortality_24h", "MOF", "icu_los", "hospital_los", "mech_vent_days")
     
-    catVars <- c("gender","race", "alive_at_30", "TBI", "severe_head", "ed_coagulopathy", "chest_injury",
-                 "abdominal_injury", "extremity_injury", "spinal_cord_injury",
-                 "ALI", "NI", "MOF", "hyperfibrinolysis", "PH_intubation", "PH_sbp_70",
-                 "any_blunt", "blunt_mechanism", "any_penetrating", "penetrating_mechanism",
-                 "PH_CPR", "initial_GCS_8", "plasma_on_helicopter", "transfer",
-                 "PH_blood", "ed_trali", "mortality_24h", "vaso_24h", "prbc_10_24h", "prbc_4_24h",
-                 "ex_lap_24", "crani_24", "IR_V_E_24", "ortho_24", "proc_other_24", "PH_time_high"
-                 )
+    catVars <- c("gender","race", "vitk", "antiplt", "t_30d_censor_h", "TBI", "severe_head", 
+                 "spinal_cord_injury", "MOF", "PH_intubation", "PH_sbp_70", "any_blunt", "blunt_mechanism",
+                 "PH_CPR", "plasma_on_helicopter", "transfer", "PH_blood", "mortality_24h", "vaso_24h", "prbc_10_24h",
+                 "crani_24", "PH_time_high", "gcs_cat", "ED_gcs_cat")
     
+    # with both p values and standardized mean differences
     tab1 <- CreateTableOne(vars = myVars, data = df, strata = "TBI", factorVars = catVars)
-    tab1 <- print(tab1, nonnormal = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
+    tab1 <- print(tab1, nonnormal = TRUE, smd = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
     View(tab1)
     
-## Table: Within TBI, Characteristics of prehospital plasma vs. standard care
+## Table 2: Within TBI, Characteristics of prehospital plasma vs. standard care
     df <- df_master_filtered_wide
+    df <- filter(df, !is.na(FFP))
+    df <- filter(df, !is.na(TBI))
     df <- filter(df, TBI==1)
-
-    myVars <- c("age", "gender", "race",
+    
+    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
+    
+    df$gcs_cat <- NA
+    df$gcs_cat[which(df$total_gcs_score < 8)] = 0
+    df$gcs_cat[which(df$total_gcs_score >= 8 & df$total_gcs_score<13)] = 1
+    df$gcs_cat[which(df$total_gcs_score >= 13)] = 2
+    df$gcs_cat <- as.factor(df$gcs_cat)
+    
+    df$ED_gcs_cat <- NA
+    df$ED_gcs_cat[which(df$ed_initial_gcs < 8)] = 0
+    df$ED_gcs_cat[which(df$ed_initial_gcs >= 8 & df$ed_initial_gcs<13)] = 1
+    df$ED_gcs_cat[which(df$ed_initial_gcs >= 13)] = 2
+    df$ED_gcs_cat <- as.factor(df$ED_gcs_cat)
+    
+    myVars <- c("age", "gender",  "race", "vitk", "antiplt",
                 
-                "initial_GCS", "initial_GCS_8", "total_gcs_score",
-                "ed_initial_gcs", "ed_highest_gcs", "ed_lowest_gcs", "iss",
-                "PH_sbp_70", "TBI", "chest_injury", "abdominal_injury", 
-                "extremity_injury", "spinal_cord_injury", "any_blunt", "blunt_mechanism", 
-                "any_penetrating", "penetrating_mechanism",
-                "severe_head",  "ais_head", "ais_chest", "ais_abdomen", "ais_extremity", "vitals_hr", "vitals_sbp",
+                "iss","ais_head", "ais_chest", "ais_abdomen", "ais_extremity",
+                "gcs_cat", "ED_gcs_cat", "PH_sbp_70", "TBI", "spinal_cord_injury", "any_blunt",
+                "blunt_mechanism",
                 
                 "PH_intubation", "PH_CPR", "plasma_on_helicopter", "PH_crystalloid",
-                "PH_prbc", "PH_blood", "PH_time", "PH_time_high", "transfer",
+                "PH_prbc", "PH_blood", "PH_time", "transfer",
                 
-                "INR", "alpha", "K", "MA", "LY30", "hyperfibrinolysis",
-                "transfusion_24h", "prbc_24h", "plasma_24h", "lactate_val",
-                "platelets_24h", "crystalloid_24h", "vaso_24h", "prbc_10_24h", "prbc_4_24h",
-                "ex_lap_24", "crani_24", "IR_V_E_24", "ortho_24", "proc_other_24",
+                "INR", "ACT", "alpha", "K", "MA", "LY30", 
+                "transfusion_24h", "prbc_24h", "plasma_24h",
+                "platelets_24h", "crystalloid_24h", "vaso_24h", "prbc_10_24h",
+                "crani_24",
                 
-                "alive_at_30", "mortality_24h", "ed_coagulopathy", "ed_coagulopathy_grade",
-                "MOF", "ALI", "NI", "icu_los", "hospital_los", "mech_vent_days",
-                
-                "GFAP_0", "GFAP_24", "GFAP_72", "UCH_L1_0", "UCH_L1_24", "UCH_L1_72",
-                
-                "cause_of_death")
+                "t_30d_censor_h", "mortality_24h", "MOF", "icu_los", "hospital_los", "mech_vent_days")
     
-    catVars <- c("gender", "race", "alive_at_30", "TBI", "severe_head", "ed_coagulopathy", "chest_injury",
-                 "abdominal_injury", "extremity_injury", "spinal_cord_injury",
-                 "ALI", "NI", "MOF", "hyperfibrinolysis", "PH_intubation", "PH_sbp_70",
-                 "any_blunt", "blunt_mechanism",  "any_penetrating", "penetrating_mechanism",
-                 "PH_CPR", "initial_GCS_8", "plasma_on_helicopter", "transfer",
-                 "PH_blood", "ed_trali", "mortality_24h", "vaso_24h", "prbc_10_24h", "prbc_4_24h",
-                 "ex_lap_24", "crani_24", "IR_V_E_24", "ortho_24", "proc_other_24", "PH_time_high",
-                 
-                 "cause_of_death"
-                 )
+    catVars <- c("gender","race", "vitk", "antiplt", "t_30d_censor_h", "TBI", "severe_head", 
+                 "spinal_cord_injury", "MOF", "PH_intubation", "PH_sbp_70", "any_blunt", "blunt_mechanism",
+                 "PH_CPR", "plasma_on_helicopter", "transfer", "PH_blood", "mortality_24h", "vaso_24h", "prbc_10_24h",
+                 "crani_24", "PH_time_high", "gcs_cat", "ED_gcs_cat")
     
     tab1 <- CreateTableOne(vars = myVars, data = df, strata = "FFP", factorVars = catVars)
-    tab1 <- print(tab1, nonnormal = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
+    tab1 <- print(tab1, nonnormal = TRUE, smd = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
     View(tab1)
-
-## Analysis: Generalized Estimating Equations (GEE) (account for site clusters)
     
+## Analysis: Generalized Estimating Equations (GEE) (account for site clusters)
     ## Data frame
     df <- df_master_filtered_wide
     df$ais_head <- as.numeric(as.character(df$ais_head))
@@ -262,8 +273,8 @@
                        PH_intubation +
                        PH_time_high +
                        gender +
-                       transfer
-                     ,
+                       transfer +
+                       frailty(SiteID, distribution="gamma"),
                      data =  df)
     
     summary(res.cox)
@@ -272,7 +283,7 @@
     test.ph
 
     
- ## Figure: box plot SC vs FFP
+## Figure: box plot SC vs FFP
     df <- df_master_filtered_long
     df <- filter(df, !is.na(hour)) # get rid of NA
     df <- filter(df, Biomarker=="GFAP" | Biomarker=="UCH_L1")
@@ -375,7 +386,6 @@
     coef(summary(res.cox))
     
     ggforest(res.cox, data = df)
-    # Put this output into df
    
     
     ## Forest Plot
@@ -398,15 +408,3 @@
       scale_y_log10(limits=c(0.01,12))
     p
 
-
-############################## Save ##############################   
-## Optional: Save a table to .csv
-    # write.table(biomarkers_long,
-    #             file = "PAMPer_biomarkers.csv",
-    #             append = FALSE, quote = TRUE, sep = ",",
-    #             eol = "\n", na = "NA", dec = ".", row.names = TRUE,
-    #             col.names = TRUE, qmethod = c("escape", "double"),
-    #             fileEncoding = "")
-
-    
-##  END.
