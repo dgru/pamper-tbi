@@ -4,7 +4,7 @@
 ## Project Support: NIH T32 in Trauma and Sepsis, University of Pittsburgh Department of Surgery
 ## PI: Dr. Jason Sperry
 ## Written by Danielle Gruen, October 2019
-## Last updated: March 2020
+## Last updated: June 2020
 
 ############################## Workspace Setup ##############################
 ## Set Up Workspace
@@ -162,12 +162,74 @@
     tab1 <- print(tab1, nonnormal = TRUE, smd = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
     View(tab1)
     
+    
+#### TBI Subtype #### 
+    df <- Subj_Initial_Injury 
+    df <- select(df, "stnum", "traumatic_brain_injury_types")
+    df <- filter(df, !is.na(traumatic_brain_injury_types))
+    
+    df_tally <- df %>%
+      group_by(traumatic_brain_injury_types) %>%
+      tally()
+    df_tally    
+    
+    # TBI Subtypes (SUBJ_Initial_Injury	traumatic_brain_injury_types) (1|2|3|4	Subdural hematoma/hemorrhage|Epidural hematoma/hemorrhage|Contusion|Other)
+    
+    df_sub <- df %>% separate(traumatic_brain_injury_types, sep='\\|', into = c('a','b','c','d'), remove=T) #%>%
+    #filter(a != '') #%>% spread(a)
+    for (i in 2:5) df_sub[,i] <- as.integer(df_sub[,i])
+    df_sub$injury1 <- 0; df_sub$injury2 <- 0; df_sub$injury3 <- 0; df_sub$injury4 <- 0
+    for (i in 1:nrow(df_sub)){
+      if (length(which(df_sub[i,c(2:5)] == 1)) > 0) df_sub$injury1[i] <- 1
+      if (length(which(df_sub[i,c(2:5)] == 2)) > 0) df_sub$injury2[i] <- 1
+      if (length(which(df_sub[i,c(2:5)] == 3)) > 0) df_sub$injury3[i] <- 1
+      if (length(which(df_sub[i,c(2:5)] == 4)) > 0) df_sub$injury4[i] <- 1
+      
+    }
+    
+    df_new <- df_sub %>% select(-c('a','b','c','d'))
+    
+    
+    ## Tally each type
+    df <- df_master_filtered_wide
+    df <- select(df, "stnum", "TBI", "FFP", "alive_at_30")
+    
+    df_merged <- merge(df, df_new, by="stnum")
+    
+    df_tally <- df_merged %>%
+      group_by(FFP) %>%
+      tally()
+    df_tally    
+    
+    
+    df <- df_merged
+    df <-filter(df, TBI==1)
+    
+    myVars <- c("injury1", "injury2", "injury3", "injury4")
+    catVars <- c("injury1", "injury2", "injury3", "injury4")
+    
+    tab1 <- CreateTableOne(vars = myVars, data = df, factorVars = catVars)
+    tab1 <- print(tab1, nonnormal = TRUE, smd = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
+    View(tab1)
+    
+    
+#### Cause of Death #### 
+    df <- df_master_filtered_wide
+    df <- filter(df, TBI==1)
+    df <- filter(df, alive_at_30==2)
+    
+    myVars <- c("cause_of_death")
+    catVars <- c("cause_of_death")
+    
+    tab1 <- CreateTableOne(vars = myVars, data = df, factorVars = catVars)
+    tab1 <- print(tab1, nonnormal = TRUE, smd = TRUE, quote = FALSE, noSpaces = TRUE, printToggle = FALSE, missing=TRUE, showAllLevels = TRUE)
+    View(tab1)
+    
 ## Analysis: Generalized Estimating Equations (GEE) (account for site clusters)
     ## Data frame
     df <- df_master_filtered_wide
     df$ais_head <- as.numeric(as.character(df$ais_head))
     
-    ## get rid of any NAs
     df <- select(df, stnum, t_30d_censor_h, FFP, TBI, alive_at_30,
                  iss, MOI, SiteID, PH_time_high,
                  PH_prbc, PH_crystalloid, PH_blood,
@@ -186,6 +248,7 @@
                       corstr = "exchangeable")
     summary(fit.gee)
     
+    # Note also test iss*FFP interaction term
     
 
 ## Figure: Kaplan Meier Survival
@@ -223,18 +286,34 @@
     
 
 ## Analysis: Cox Hazard Model TBI and No TBI
-    ## COX within TBI
+
     df <- df_master_filtered_wide
     df <- filter(df, TBI==1)
 
-    df$iss_cat[which(df$iss < 25)] = 0
-    df$iss_cat[which(df$iss >= 25)] = 1
-    df$iss_cat <- as.factor(df$iss_cat)
+    df <- select(df, "stnum", "TBI", "t_30d_mort_h", "t_30d_censor_h",
+                 "age", "total_gcs_score", "PH_crystalloid", "FFP", "PH_prbc", "PH_intubation", "PH_time_high",
+                 "gender", "transfer", "SiteID", "MOI", "iss", "PH_sbp_70", "initial_GCS_8",
+                 "ais_head", "ais_face", "ais_chest", "ais_abdomen", "ais_extremity", "ais_external")
     
-    res.cox <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ 
+
+    df$ais_head <- as.numeric(levels(df$ais_head))[df$ais_head]
+    df$SiteID <- as.factor(df$SiteID)
+    
+    # category for other body regions >3
+    df$AIS_cat <- NA
+    df$AIS_cat[which(df$ais_chest<3 & df$ais_abdomen<3 & df$ais_extremity<3)] = 0 
+    df$AIS_cat[which(df$ais_chest>=3 | df$ais_abdomen>=3 | df$ais_extremity>=3)] = 1 
+    df$AIS_cat <- as.factor(df$AIS_cat)
+    
+    tally_df <- df %>%
+      group_by(AIS_cat) %>%
+      tally()
+    tally_df
+    
+    res.frailty <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ 
                        age + 
                        total_gcs_score +
-                       iss_cat + 
+                       AIS_cat +
                        ais_head +
                        PH_crystalloid + 
                        FFP + 
@@ -242,46 +321,18 @@
                        PH_intubation +
                        PH_time_high +
                        gender +
-                       transfer
-                     ,
-                     data =  df)
-    
-    summary(res.cox)
-    
-    vif(res.cox)
-    
-    test.ph <- cox.zph(res.cox)
-    test.ph
-   
-    ## COX within NO TBI
-    df <- df_master_filtered_wide
-    df <- filter(df, TBI==2)
-     
-    df$iss_cat <- NA
-    df$iss_cat[which(df$iss < 25)] = 0
-    df$iss_cat[which(df$iss >=25)] = 1
-    df$iss_cat <- as.factor(df$iss_cat)
-    
-    res.cox <- coxph(Surv(t_30d_mort_h, t_30d_censor_h) ~ 
-                       age + 
-                       total_gcs_score +
-                       iss_cat + 
-                       ais_head +
-                       PH_crystalloid + 
-                       FFP + 
-                       PH_prbc +
-                       PH_intubation +
-                       PH_time_high +
-                       gender +
+                       PH_sbp_70 +
                        transfer +
                        frailty(SiteID, distribution="gamma"),
                      data =  df)
     
-    summary(res.cox)
+    summary(res.frailty)
     
-    test.ph <- cox.zph(res.cox)
+    vif(res.frailty)
+    
+    test.ph <- cox.zph(res.frailty)
     test.ph
-
+   
     
 ## Figure: box plot SC vs FFP
     df <- df_master_filtered_long
