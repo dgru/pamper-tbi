@@ -1,6 +1,6 @@
 # PAMPer TBI
 
-Secondary analysis for prespecified subgroup. Code to accompany Gruen et al., 2020 (submitted). Includes code for summary statistics, Generalized Estimating Equation, Cox proportional-hazards models, Kaplan-Meier analyses, and manuscript tables and figures.
+Secondary analysis for prespecified subgroup. Code to accompany Gruen et al., 2020 (submitted). Includes code for summary statistics, generalized estimating equation, Cox proportional hazards models, Kaplan-Meier analyses, and manuscript tables and figures.
 
 PreHospital Air Medical Plasma Trial (PAMPer) Clinical Trial #NCT01818427 (https://clinicaltrials.gov/ct2/show/study/NCT01818427)
 
