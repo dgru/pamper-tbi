@@ -1,6 +1,8 @@
 # PAMPer TBI
 
-Code for Gruen et al., 2020. Includes code for summary statistics, GEE, Cox proportional hazards models, Kaplan-Meier analyses, and tables and figures.
+Code for Gruen et al., 2020, JAMA Network Open (doi:10.1001/jamanetworkopen.2020.16869)
+
+Includes code for summary statistics, GEE, Cox proportional hazards models, Kaplan-Meier analyses, and tables and figures.
 
 PreHospital Air Medical Plasma Trial (PAMPer) Clinical Trial #NCT01818427 (https://clinicaltrials.gov/ct2/show/study/NCT01818427)
 
